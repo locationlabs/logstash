@@ -1,0 +1,16 @@
+The Debian Package logstash
+----------------------------
+
+Comments regarding the Package
+
+-- Corey Quinn <corey@sequestered.net>  Sun, 24 Feb 2013 18:24:41 -0800
+-- Luis Morales <luis.morales@locationlabs.com> Tue, 02 Apr 2013 12:13:45 -0100
+
+Package has been changed to depend on supervisor and no longer require the default-jre (openjdk) so you can use your
+favorite flavor of java.
+
+Agent configuration is placed in /etc/logstash/conf.d
+
+The agent will read all config files located there
+
+
