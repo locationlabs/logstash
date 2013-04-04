@@ -281,7 +281,7 @@ monolithic-deb: build/logstash-$(VERSION)-monolithic.jar
 	(cd debian; ./build.sh ../build/logstash-$(VERSION)-monolithic.jar)
 
 flatjar-deb: build/logstash-$(VERSION)-flatjar.jar
-        (cd debian; ./build.sh ../build/logstash-$(VERSION)-flatjar.jar)
+	(cd debian; ./build.sh ../build/logstash-$(VERSION)-flatjar.jar)
 
 
 .PHONY: patterns
