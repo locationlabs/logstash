@@ -1,3 +1,9 @@
+logstash (1.1.9~3) unstable; urgency=low
+
+  * Run logstash from python script using os.execvp to avoid proccess fork
+
+ -- Luis Morales <luis.morales@locationlabs.com>  Mon, 01 May 2013 13:01:16 +0100
+
 logstash (1.1.9~2) unstable; urgency=low
 
   * Depend on supervisord
