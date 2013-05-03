@@ -1,8 +1,8 @@
 logstash (1.1.9~3) unstable; urgency=low
 
-  * Run logstash from python script using os.execvp to avoid proccess fork
+  * Avoid proccess fork when launching java process.
 
- -- Luis Morales <luis.morales@locationlabs.com>  Mon, 01 May 2013 13:01:16 +0100
+ -- Eric Siegel <eric@locationlabs.com>  Mon, 02 May 2013 17:33:16 -0700
 
 logstash (1.1.9~2) unstable; urgency=low
 
