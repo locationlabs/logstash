@@ -358,3 +358,9 @@ kibana: | build
 
 kibana-flatjar: | kibana
 	$(QUIET)jar uf build/logstash-$(VERSION)-flatjar.jar -C build/kibana .
+
+monolithic-deb: build/logstash-$(VERSION)-monolithic.jar
+	(cd debian; ./build.sh ../build/logstash-$(VERSION)-monolithic.jar)
+
+flatjar-deb: build/logstash-$(VERSION)-flatjar.jar
+	(cd debian; ./build.sh ../build/logstash-$(VERSION)-flatjar.jar)
