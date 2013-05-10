@@ -161,9 +161,9 @@ build/monolith: compile copy-ruby-files vendor/jar/graphtastic-rmiclient.jar
 	@# copy openssl/lib/shared folders/files to root of jar - need this for openssl to work with JRuby
 	$(QUIET)mkdir -p $@/openssl
 	$(QUIET)mkdir -p $@/jopenssl
-	$(QUIET)cp -r $$PWD/vendor/bundle/jruby/1.9/gems/jruby-openss*/lib/shared/openssl/* $@/openssl
-	$(QUIET)cp -r $$PWD/vendor/bundle/jruby/1.9/gems/jruby-openss*/lib/shared/jopenssl/* $@/jopenssl
-	$(QUIET)cp -r $$PWD/vendor/bundle/jruby/1.9/gems/jruby-openss*/lib/shared/openssl.rb $@/openssl.rb
+	#$(QUIET)cp -f -r $$PWD/vendor/bundle/jruby/1.9/gems/jruby-openss*/lib/shared/openssl/* $@/openssl
+	#$(QUIET)cp -f -r $$PWD/vendor/bundle/jruby/1.9/gems/jruby-openss*/lib/shared/jopenssl/* $@/jopenssl
+	#$(QUIET)cp -f -r $$PWD/vendor/bundle/jruby/1.9/gems/jruby-openss*/lib/shared/openssl.rb $@/openssl.rb
 	@# Purge any extra files we don't need in META-INF (like manifests and
 	@# signature files)
 	-$(QUIET)rm -f $@/META-INF/*.LIST

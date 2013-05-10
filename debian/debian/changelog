@@ -1,3 +1,7 @@
+logstash (1.1.12~1) unstable; urgency=low
+
+ -- Luis Morales <luis.morales@locationlabs.com>  Mon, 10 May 2013 10:00:16 -0700
+
 logstash (1.1.9~3) unstable; urgency=low
 
   * Avoid proccess fork when launching java process.
