@@ -165,7 +165,6 @@ build/ruby: | build
 .PHONY: build/monolith
 build/monolith: $(ELASTICSEARCH) $(JRUBY) $(GEOIP) vendor-gems | build
 build/monolith: vendor/ua-parser/regexes.yaml
-build/monolith: vendor/kibana
 build/monolith: compile copy-ruby-files vendor/jar/graphtastic-rmiclient.jar
 	-$(QUIET)mkdir -p $@
 	@# Unpack all the 3rdparty jars and any jars in gems
@@ -193,7 +192,6 @@ build/monolith: compile copy-ruby-files vendor/jar/graphtastic-rmiclient.jar
 	-$(QUIET)mkdir -p $@/vendor/ua-parser
 	-$(QUIET)cp vendor/ua-parser/regexes.yaml $@/vendor/ua-parser
 	$(QUIET)cp $(GEOIP) $@/
-	-$(QUIET)rsync -a vendor/kibana/ $@/vendor/kibana/
 
 vendor/ua-parser/: | build
 	$(QUIET)mkdir $@
@@ -377,7 +375,3 @@ package:
 		./build.sh debian 6; \
 	)
 
-vendor/kibana: | build
-	$(QUIET)mkdir vendor/kibana || true
-	$(DOWNLOAD_COMMAND) - $(KIBANA_URL) | tar -C $@ -zx --strip-components=1
-	$(QUIET)sed -e "s/@message/message/g" vendor/kibana/dashboards/logstash.json > vendor/kibana/dashboards/default.json
