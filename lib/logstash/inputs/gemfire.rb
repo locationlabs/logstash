@@ -14,10 +14,9 @@ require "logstash/namespace"
 class LogStash::Inputs::Gemfire < LogStash::Inputs::Threadable
 
   config_name "gemfire"
-  plugin_status "experimental"
+  milestone 1
 
-  # Your client cache name
-  config :name, :validate => :string, :deprecated => true
+  default :codec, "plain"
 
   # Your client cache name
   config :cache_name, :validate => :string, :default => "logstash"
@@ -53,21 +52,6 @@ class LogStash::Inputs::Gemfire < LogStash::Inputs::Threadable
 
   # How the message is serialized in the cache. Can be one of "json" or "plain"; default is plain
   config :serialization, :validate => :string, :default => nil
-
-  if @name
-    if @cache_name
-      @logger.error("'name' and 'cache_name' are the same setting, but 'name' is deprecated. Please use only 'cache_name'")
-    end
-    @cache_name = @name
-  end
-
-  public
-  def initialize(params)
-    super
-
-    @format ||= "plain"
-
-  end # def initialize
 
   public
   def register
@@ -156,11 +140,11 @@ class LogStash::Inputs::Gemfire < LogStash::Inputs::Threadable
     end
   end
 
-  def process_event(event, event_name, source)
+  def process_event(event, event_name)
     message = deserialize_message(event)
-    e = to_event(message, source)
-    if e
-      @logstash_queue << e
+    @codec.decode(message) do |event|
+      decorate(event)
+      @logstash_queue << event
     end
   end
 
@@ -234,4 +218,4 @@ class LogStash::Inputs::Gemfire < LogStash::Inputs::Threadable
   def afterRegionInvalidate(event)
     @logger.debug("afterRegionInvalidate #{event}")
   end
-end # class LogStash::Inputs::Amqp
+end # class LogStash::Inputs::Gemfire

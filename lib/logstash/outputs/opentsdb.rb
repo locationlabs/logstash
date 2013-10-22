@@ -7,7 +7,7 @@ require "socket"
 #
 class LogStash::Outputs::Opentsdb < LogStash::Outputs::Base
   config_name "opentsdb"
-  plugin_status "experimental"
+  milestone 1
 
   # Enable debugging. Tries to pretty-print the entire event object.
   config :debug, :validate => :boolean
@@ -18,17 +18,17 @@ class LogStash::Outputs::Opentsdb < LogStash::Outputs::Base
   # The port to connect on your graphite server.
   config :port, :validate => :number, :default => 4242
 
-  # The metric(s) to use. This supports dynamic strings like %{@source_host}
+  # The metric(s) to use. This supports dynamic strings like %{source_host}
   # for metric names and also for values. This is an array field with key
   # of the metric name, value of the metric value, and multiple tag,values . Example:
   #
   #     [
-  #       "%{@source_host}/uptime",
+  #       "%{host}/uptime",
   #       %{uptime_1m} " ,
   #       "hostname" ,
-  #       "%{@source_host}
+  #       "%{host}
   #       "anotherhostname" ,
-  #       "%{@source_host}
+  #       "%{host}
   #     ]
   #
   # The value will be coerced to a floating point value. Values which cannot be
@@ -55,7 +55,7 @@ class LogStash::Outputs::Opentsdb < LogStash::Outputs::Base
   def receive(event)
     return unless output?(event)
 
-    # Opentsdb message format: metric timestamp value tagname=tagvalue tag2=value2\n
+    # Opentsdb message format: put metric timestamp value tagname=tagvalue tag2=value2\n
 
     # Catch exceptions like ECONNRESET and friends, reconnect on failure.
     begin
@@ -64,7 +64,8 @@ class LogStash::Outputs::Opentsdb < LogStash::Outputs::Base
       tags = metrics[2..-1]
 
       # The first part of the message
-      message = [event.sprintf(name),
+      message = ['put',
+                 event.sprintf(name),
                  event.sprintf("%{+%s}"),
                  event.sprintf(value),
       ].join(" ")

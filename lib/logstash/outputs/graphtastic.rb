@@ -15,7 +15,7 @@ require "logstash/namespace"
 class LogStash::Outputs::GraphTastic < LogStash::Outputs::Base
   
   config_name "graphtastic"
-  plugin_status "beta"
+  milestone 2
   
   # options are udp(fastest - default) - rmi(faster) - rest(fast) - tcp(don't use TCP yet - some problems - errors out on linux)
   config :integration, :validate => ["udp","tcp","rmi","rest"], :default => "udp"
@@ -94,7 +94,7 @@ class LogStash::Outputs::GraphTastic < LogStash::Outputs::Base
   def receive(event)
     return unless output?(event)
     # Set Intersection - returns a new array with the items that are the same between the two
-    if !@tags.empty? && (event.tags & @tags).size == 0
+    if !@tags.empty? && (event["tags"] & @tags).size == 0
        # Skip events that have no tags in common with what we were configured
        @logger.debug("No Tags match for GraphTastic Output!")
        return
@@ -102,7 +102,7 @@ class LogStash::Outputs::GraphTastic < LogStash::Outputs::Base
     @retry = 1
     @logger.debug("Event found for GraphTastic!", :tags => @tags, :event => event)
     @metrics.each do |name, metric|
-      postMetric(event.sprintf(name),event.sprintf(metric),(event.unix_timestamp*1000))# unix_timestamp is what I need in seconds - multiply by 1000 to make milliseconds.
+      postMetric(event.sprintf(name),event.sprintf(metric),(event["@timestamp"]*1000))# unix_timestamp is what I need in seconds - multiply by 1000 to make milliseconds.
     end
   end
   

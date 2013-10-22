@@ -4,12 +4,12 @@ require "logstash/filters/json"
 describe LogStash::Filters::Json do
   extend LogStash::RSpec
 
-  describe "parse @message into @fields" do
+  describe "parse message into the event" do
     config <<-CONFIG
       filter {
         json {
-          # Parse @message as JSON, store the results in the 'data' field'
-          "@message" => "@fields"
+          # Parse message as JSON, store the results in the 'data' field'
+          source => "message"
         }
       }
     CONFIG
@@ -21,12 +21,13 @@ describe LogStash::Filters::Json do
     end
   end
 
-  describe "parse @message into a target field" do
+  describe "parse message into a target field" do
     config <<-CONFIG
       filter {
         json {
-          # Parse @message as JSON, store the results in the 'data' field'
-          "@message" => "data"
+          # Parse message as JSON, store the results in the 'data' field'
+          source => "message"
+          target => "data"
         }
       }
     CONFIG
@@ -42,8 +43,9 @@ describe LogStash::Filters::Json do
     config <<-CONFIG
       filter {
         json {
-          # Parse @message as JSON, store the results in the 'data' field'
-          "@message" => "data"
+          # Parse message as JSON, store the results in the 'data' field'
+          source => "message"
+          target => "data"
         }
       }
     CONFIG

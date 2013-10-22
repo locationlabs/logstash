@@ -14,27 +14,9 @@ describe LogStash::Filters::CSV do
     CONFIG
 
     sample "big,bird,sesame street" do
-      insist { subject["field1"] } == "big"
-      insist { subject["field2"] } == "bird"
-      insist { subject["field3"] } == "sesame street"
-    end
-  end
-
-  describe "given fields" do
-    # The logstash config goes here.
-    # At this time, only filters are supported.
-    config <<-CONFIG
-      filter {
-        csv {
-          fields => ["first", "last", "address" ]
-        }
-      }
-    CONFIG
-
-    sample "big,bird,sesame street" do
-      insist { subject["first"] } == "big"
-      insist { subject["last"] } == "bird"
-      insist { subject["address"] } == "sesame street"
+      insist { subject["column1"] } == "big"
+      insist { subject["column2"] } == "bird"
+      insist { subject["column3"] } == "sesame street"
     end
   end
 
@@ -48,16 +30,34 @@ describe LogStash::Filters::CSV do
     CONFIG
 
     sample "big,bird;sesame street" do
-      insist { subject["field1"] } == "big,bird"
-      insist { subject["field2"] } == "sesame street"
+      insist { subject["column1"] } == "big,bird"
+      insist { subject["column2"] } == "sesame street"
     end
   end
 
-  describe "parse csv with more data than defined field names" do
+  describe "given columns" do
+    # The logstash config goes here.
+    # At this time, only filters are supported.
     config <<-CONFIG
       filter {
         csv {
-          fields => ["custom1", "custom2"]
+          columns => ["first", "last", "address" ]
+        }
+      }
+    CONFIG
+
+    sample "big,bird,sesame street" do
+      insist { subject["first"] } == "big"
+      insist { subject["last"] } == "bird"
+      insist { subject["address"] } == "sesame street"
+    end
+  end
+
+  describe "parse csv with more data than defined column names" do
+    config <<-CONFIG
+      filter {
+        csv {
+          columns => ["custom1", "custom2"]
         }
       }
     CONFIG
@@ -65,54 +65,64 @@ describe LogStash::Filters::CSV do
     sample "val1,val2,val3" do
       insist { subject["custom1"] } == "val1"
       insist { subject["custom2"] } == "val2"
-      insist { subject["field3"] } == "val3"
+      insist { subject["column3"] } == "val3"
     end
   end
 
-  describe "parse csv from a given field without field names" do
+
+  describe "parse csv from a given source with column names" do
     config <<-CONFIG
       filter {
         csv {
-          raw => "data"
+          source => "datafield"
+          columns => ["custom1", "custom2", "custom3"]
         }
       }
     CONFIG
 
-    sample({"@fields" => {"raw" => "val1,val2,val3"}}) do
-      insist { subject["data"]["field1"] } == "val1"
-      insist { subject["data"]["field2"] } == "val2"
-      insist { subject["data"]["field3"] } == "val3"
+    sample("datafield" => "val1,val2,val3") do
+      insist { subject["custom1"] } == "val1"
+      insist { subject["custom2"] } == "val2"
+      insist { subject["custom3"] } == "val3"
     end
   end
 
-  describe "parse csv from a given field with field names" do
+  describe "given target" do
+    # The logstash config goes here.
+    # At this time, only filters are supported.
     config <<-CONFIG
       filter {
         csv {
-          raw => "data"
-          fields => ["custom1", "custom2", "custom3"]
+          target => "data"
         }
       }
     CONFIG
 
-    sample({"@fields" => {"raw" => "val1,val2,val3"}}) do
-      insist { subject["data"]["custom1"] } == "val1"
-      insist { subject["data"]["custom2"] } == "val2"
-      insist { subject["data"]["custom3"] } == "val3"
+    sample "big,bird,sesame street" do
+      insist { subject["data"]["column1"] } == "big"
+      insist { subject["data"]["column2"] } == "bird"
+      insist { subject["data"]["column3"] } == "sesame street"
     end
   end
 
-  describe "fail to parse any data in a multi-value field" do
+  describe "given target and source" do
+    # The logstash config goes here.
+    # At this time, only filters are supported.
     config <<-CONFIG
       filter {
         csv {
-          raw => "data"
+          source => "datain"
+          target => "data"
         }
       }
     CONFIG
 
-    sample({"@fields" => {"raw" => ["val1,val2,val3", "val1,val2,val3"]}}) do
-      insist { subject["data"] } == nil
+    sample("datain" => "big,bird,sesame street") do
+      insist { subject["data"]["column1"] } == "big"
+      insist { subject["data"]["column2"] } == "bird"
+      insist { subject["data"]["column3"] } == "sesame street"
     end
   end
+
+
 end

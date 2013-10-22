@@ -1,6 +1,7 @@
 require "logstash/namespace"
 require "logstash/logging"
 require "logstash/config/mixin"
+require "cabin"
 
 class LogStash::Plugin
   attr_accessor :params
@@ -20,8 +21,7 @@ class LogStash::Plugin
   public
   def initialize(params=nil)
     @params = params
-    @logger = LogStash::Logger.new(STDOUT)
-    @logger.level = $DEBUG ? :debug : :warn
+    @logger = Cabin::Channel.get(LogStash)
   end
 
   # This method is called when someone or something wants this plugin to shut
@@ -47,6 +47,8 @@ class LogStash::Plugin
   # forever.
   public
   def finished
+    # TODO(sissel): I'm not sure what I had planned for this shutdown_queue
+    # thing
     if @shutdown_queue
       @logger.info("Sending shutdown event to agent queue", :plugin => self)
       @shutdown_queue << self
@@ -103,4 +105,45 @@ class LogStash::Plugin
     Thread.current[:watchdog] = nil
     Thread.current[:watchdog_state] = nil
   end
+
+  public
+  def inspect
+    if !@config.nil?
+      description = @config \
+        .select { |k,v| !v.nil? && (v.respond_to?(:empty?) && !v.empty?) } \
+        .collect { |k,v| "#{k}=>#{v.inspect}" }
+      return "<#{self.class.name} #{description.join(", ")}>"
+    else
+      return "<#{self.class.name} --->"
+    end
+  end
+
+  # Look up a plugin by type and name.
+  public
+  def self.lookup(type, name)
+    # Try to load the plugin requested.
+    # For example, load("filter", "grok") will try to require
+    #   logstash/filters/grok
+    #
+    # And expects to find LogStash::Filters::Grok (or something similar based
+    # on pattern matching
+    path = "logstash/#{type}s/#{name}"
+    require(path)
+
+    base = LogStash.const_get("#{type.capitalize}s")
+    klass = nil
+    #klass_sym = base.constants.find { |c| c.to_s =~ /^#{Regexp.quote(name)}$/i }
+    #if klass_sym.nil?
+    
+    # Look for a plugin by the config_name
+    klass_sym = base.constants.find { |k| base.const_get(k).config_name == name }
+    klass = base.const_get(klass_sym)
+
+    raise LoadError if klass.nil?
+
+    return klass
+  rescue LoadError => e
+    raise LogStash::PluginLoadingError,
+      I18n.t("logstash.pipeline.plugin-loading-error", :type => type, :name => name, :path => path, :error => e.to_s)
+  end # def load
 end # class LogStash::Plugin

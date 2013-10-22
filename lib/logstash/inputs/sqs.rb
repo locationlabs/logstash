@@ -1,5 +1,6 @@
 require "logstash/inputs/threadable"
 require "logstash/namespace"
+require "logstash/plugin_mixins/aws_config"
 
 # Pull events from an Amazon Web Services Simple Queue Service (SQS) queue.
 #
@@ -54,33 +55,38 @@ require "logstash/namespace"
 # See http://aws.amazon.com/iam/ for more details on setting up AWS identities.
 #
 class LogStash::Inputs::SQS < LogStash::Inputs::Threadable
+  include LogStash::PluginMixins::AwsConfig
+
   config_name "sqs"
-  plugin_status "experimental"
+  milestone 1
+
+  default :codec, "json"
 
   # Name of the SQS Queue name to pull messages from. Note that this is just the name of the queue, not the URL or ARN.
   config :queue, :validate => :string, :required => true
 
-  # AWS access key. Must have the appropriate permissions.
-  config :access_key, :validate => :string, :required => true
+  # Name of the event field in which to store the SQS message ID
+  config :id_field, :validate => :string
 
-  # AWS secret key. Must have the appropriate permissions.
-  config :secret_key, :validate => :string, :required => true
+  # Name of the event field in which to store the SQS message MD5 checksum
+  config :md5_field, :validate => :string
 
-  def initialize(params)
-    super
-    @format ||= "json_event"
-  end # def initialize
+  # Name of the event field in which to store the  SQS message Sent Timestamp
+  config :sent_timestamp_field, :validate => :string
+
+  public
+  def aws_service_endpoint(region)
+    return {
+        :sqs_endpoint => "sqs.#{region}.amazonaws.com"
+    }
+  end
 
   public
   def register
     @logger.info("Registering SQS input", :queue => @queue)
     require "aws-sdk"
 
-    # Connec to SQS
-    @sqs = AWS::SQS.new(
-      :access_key_id => @access_key,
-      :secret_access_key => @secret_key
-    )
+    @sqs = AWS::SQS.new(aws_options_hash)
 
     begin
       @logger.debug("Connecting to AWS SQS queue", :queue => @queue)
@@ -95,10 +101,11 @@ class LogStash::Inputs::SQS < LogStash::Inputs::Threadable
   public
   def run(output_queue)
     @logger.debug("Polling SQS queue", :queue => @queue)
-    
+
     receive_opts = {
-      :limit => 10,
-      :visibility_timeout => 30
+        :limit => 10,
+        :visibility_timeout => 30,
+        :attributes => [:sent_at]
     }
 
     continue_polling = true
@@ -106,12 +113,21 @@ class LogStash::Inputs::SQS < LogStash::Inputs::Threadable
       continue_polling = run_with_backoff(60, 1) do
         @sqs_queue.receive_message(receive_opts) do |message|
           if message
-            e = to_event(message.body, @sqs_queue)
-            if e
-              @logger.debug("Processed SQS message", :message_id => message.id, :message_md5 => message.md5, :queue => @queue)
-              output_queue << e
+            @codec.decode(message.body) do |event|
+              decorate(event)
+              if @id_field
+                event[@id_field] = message.id
+              end
+              if @md5_field
+                event[@md5_field] = message.md5
+              end
+              if @sent_timestamp_field
+                event[@sent_timestamp_field] = message.sent_timestamp.utc
+              end
+              @logger.debug? && @logger.debug("Processed SQS message", :message_id => message.id, :message_md5 => message.md5, :sent_timestamp => message.sent_timestamp, :queue => @queue)
+              output_queue << event
               message.delete
-            end # valid event
+            end # codec.decode
           end # valid SQS message
         end # receive_message
       end # run_with_backoff
@@ -135,7 +151,7 @@ class LogStash::Inputs::SQS < LogStash::Inputs::Threadable
       @logger.error("AWS::EC2::Errors::RequestLimitExceeded ... failed.", :queue => @queue)
       return false
     end # retry limit exceeded
-    
+
     begin
       block.call
     rescue AWS::EC2::Errors::RequestLimitExceeded

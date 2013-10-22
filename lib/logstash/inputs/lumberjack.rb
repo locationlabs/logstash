@@ -8,7 +8,9 @@ require "logstash/namespace"
 class LogStash::Inputs::Lumberjack < LogStash::Inputs::Base
 
   config_name "lumberjack"
-  plugin_status "experimental"
+  milestone 1
+
+  default :codec, "plain"
 
   # the address to listen on.
   config :host, :validate => :string, :default => "0.0.0.0"
@@ -17,10 +19,10 @@ class LogStash::Inputs::Lumberjack < LogStash::Inputs::Base
   config :port, :validate => :number, :required => true
 
   # ssl certificate to use
-  config :ssl_certificate, :validate => :string, :required => true
+  config :ssl_certificate, :validate => :path, :required => true
 
   # ssl key to use
-  config :ssl_key, :validate => :string, :required => true
+  config :ssl_key, :validate => :path, :required => true
 
   # ssl key passphrase to use
   config :ssl_key_passphrase, :validate => :password
@@ -40,14 +42,11 @@ class LogStash::Inputs::Lumberjack < LogStash::Inputs::Base
   public
   def run(output_queue)
     @lumberjack.run do |l|
-      source = "lumberjack://#{l.delete("host")}/#{l.delete("file")}"
-      event = to_event(l.delete("line"), source)
-      # take any remaining fields in the lumberjack event and merge it as a
-      # field in the logstash event.
-      l.each do |key, value|
-        event[key] = value
+      @codec.decode(l.delete("line")) do |event|
+        decorate(event)
+        l.each { |k,v| event[k] = v }
+        output_queue << event
       end
-      output_queue << event
     end
   end # def run
 end # class LogStash::Inputs::Lumberjack

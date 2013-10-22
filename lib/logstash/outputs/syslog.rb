@@ -8,7 +8,7 @@ require "date"
 # UDP or TCP syslog transport is supported
 class LogStash::Outputs::Syslog < LogStash::Outputs::Base
   config_name "syslog"
-  plugin_status "experimental"
+  milestone 1
 
   FACILITY_LABELS = [
     "kernel",
@@ -64,7 +64,7 @@ class LogStash::Outputs::Syslog < LogStash::Outputs::Base
   config :severity, :validate => SEVERITY_LABELS, :required => true
 
   # source host for syslog message
-  config :sourcehost, :validate => :string, :default => "%{@source_host}"
+  config :sourcehost, :validate => :string, :default => "%{host}"
 
   # timestamp for syslog message
   config :timestamp, :validate => :string, :default => "%{@timestamp}"
@@ -111,6 +111,8 @@ class LogStash::Outputs::Syslog < LogStash::Outputs::Base
   def receive(event)
     return unless output?(event)
 
+    appname = event.sprintf(@appname)
+    procid = event.sprintf(@procid)
     sourcehost = event.sprintf(@sourcehost)
 
     facility_code = FACILITY_LABELS.index(@facility)
@@ -121,19 +123,21 @@ class LogStash::Outputs::Syslog < LogStash::Outputs::Base
 
     if rfc3164?
        timestamp = DateTime.iso8601(event.sprintf(@timestamp)).strftime("%b %e %H:%M:%S")
-       syslog_msg = "<"+priority.to_s()+">"+timestamp+" "+sourcehost+" "+@appname+"["+@procid+"]: "+event.message
+       syslog_msg = "<"+priority.to_s()+">"+timestamp+" "+sourcehost+" "+appname+"["+procid+"]: "+event["message"]
     else
+       msgid = event.sprintf(@msgid)
        timestamp = DateTime.iso8601(event.sprintf(@timestamp)).rfc3339()
-       syslog_msg = "<"+priority.to_s()+">1 "+timestamp+" "+sourcehost+" "+@appname+" "+@procid+" "+@msgid+" - "+event.message
+       syslog_msg = "<"+priority.to_s()+">1 "+timestamp+" "+sourcehost+" "+appname+" "+procid+" "+msgid+" - "+event["message"]
     end
 
-      begin
-        connect unless @client_socket
-        @client_socket.write(syslog_msg + "\n")
-      rescue => e
-        @logger.warn(@protocol+" output exception", :host => @host, :port => @port,
-                     :exception => e, :backtrace => e.backtrace)
-        @client_socket.close
-      end
+    begin
+      connect unless @client_socket
+      @client_socket.write(syslog_msg + "\n")
+    rescue => e
+      @logger.warn(@protocol+" output exception", :host => @host, :port => @port,
+                 :exception => e, :backtrace => e.backtrace)
+      @client_socket.close
+    end
   end
 end
+

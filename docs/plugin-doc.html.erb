@@ -3,7 +3,7 @@ title: logstash docs for <%= section %>s/<%= name %>
 layout: content_right
 ---
 <h2><%= name %></h2>
-<h3>Status: <a href="../plugin-status"><%= @plugin_status %></a></h3>
+<h3>Milestone: <a href="../plugin-milestones"><%= @milestone %></a></h3>
 
 <%= description %>
 
@@ -29,31 +29,19 @@ This plugin provides the following flags:
 
 This is what it might look like in your config file:
 
-<pre><code><%= section %> {
-  <%= name %> {
-<% sorted_attributes.each do |name, config|
-     next if config[:deprecated]
-     if config[:validate].is_a?(Array) 
-       annotation = "string, one of #{config[:validate].inspect}"
-     else 
-       annotation = "#{config[:validate]}"
-     end
-
-     if name.is_a?(Regexp)
-       name = "/" + name.to_s.gsub(/^\(\?-mix:/, "").gsub(/\)$/, "") + "/"
-     end
-     if config[:required]
-       annotation += " (required)"
-     else
-       annotation += " (optional)"
-     end
-     annotation += ", default: #{config[:default].inspect}" if config.include?(:default)
--%>
-    <a href="#setting_<%= name %>"><%= name %></a> => ... # <%= annotation %>
-<% end -%>
+<pre><code><% if section == "codec" -%>
+# with an input plugin:
+# you can also use this codec with an output.
+input { 
+  file { 
+    codec =&gt; <%= synopsis.split("\n").map { |l| "  #{l}" }.join("\n") %>
   }
 }
-</code></pre>
+<% else -%>
+<%= section %> {
+  <%= synopsis %>
+}
+<% end -%></code></pre>
 
 <h3> Details </h3>
 
@@ -67,7 +55,7 @@ This is what it might look like in your config file:
      end
 -%>
 <h4> 
-  <a name="setting_<%= name %>">
+  <a name="<%= name %>">
     <%= name %><%= " (required setting)" if config[:required] %>
     <%= " <strong>DEPRECATED</strong>" if config[:deprecated] %>
 </a>
@@ -81,9 +69,9 @@ This is what it might look like in your config file:
   <li> The configuration attribute name here is anything that matches the above regular expression. </li>
 <% end -%>
 <% if config[:validate].is_a?(Symbol) -%>
-  <li> Value type is <%= config[:validate] %> </li>
+  <li> Value type is <a href="../configuration#<%= config[:validate] %>"><%= config[:validate] %></a> </li>
 <% elsif config[:validate].nil? -%>
-  <li> Value type is string </li>
+  <li> Value type is <a href="../configuration#string">string</a> </li>
 <% elsif config[:validate].is_a?(Array) -%>
   <li> Value can be any of: <%= config[:validate].map(&:inspect).join(", ") %> </li>
 <% end -%>

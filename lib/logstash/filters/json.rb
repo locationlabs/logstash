@@ -6,35 +6,43 @@ require "logstash/namespace"
 class LogStash::Filters::Json < LogStash::Filters::Base
 
   config_name "json"
-  plugin_status "beta"
+  milestone 2
 
   # Config for json is:
-  # 
-  # * source => dest
   #
-  # For example, if you have a field named 'foo' that contains your json,
-  # and you want to store the evaluated json object in 'bar', do this:
+  #     source => source_field
+  #
+  # For example, if you have json data in the @message field:
   #
   #     filter {
   #       json {
-  #         foo => bar
+  #         source => "message"
   #       }
   #     }
   #
-  # JSON in the value of the source field will be expanded into a
-  # datastructure in the "dest" field.  Note: if the "dest" field
-  # already exists, it will be overridden.
-  config /[A-Za-z0-9_@-]+/, :validate => :string
+  # The above would parse the json from the @message field
+  config :source, :validate => :string, :required => true
+
+  # Define target for placing the data. If this setting is omitted,
+  # the json data will be stored at the root of the event.
+  #
+  # For example if you want the data to be put in the 'doc' field:
+  #
+  #     filter {
+  #       json {
+  #         target => "doc"
+  #       }
+  #     }
+  #
+  # json in the value of the source field will be expanded into a
+  # datastructure in the "target" field.
+  #
+  # Note: if the "target" field already exists, it will be overwritten.
+  config :target, :validate => :string
 
   public
   def register
-    @json = {}
-
-    @config.each do |field, dest|
-      next if RESERVED.member?(field)
-
-      @json[field] = dest
-    end
+    # Nothing to do here
   end # def register
 
   public
@@ -43,31 +51,31 @@ class LogStash::Filters::Json < LogStash::Filters::Base
 
     @logger.debug("Running json filter", :event => event)
 
-    matches = 0
-    @json.each do |key, dest|
-      next unless event[key]
-      if event[key].is_a?(String)
-        event[key] = [event[key]]
-      end
+    return unless event.include?(@source)
 
-      if event[key].length > 1
-        @logger.warn("JSON filter only works on single fields (not lists)",
-                     :key => key, :value => event[key])
-        next
-      end
+    if @target.nil?
+      # Default is to write to the root of the event.
+      dest = event.to_hash
+    else
+      dest = event[@target] ||= {}
+    end
 
-      raw = event[key].first
-      begin
-        event[dest] = JSON.parse(raw)
-        filter_matched(event)
-      rescue => e
-        event.tags << "_jsonparsefailure"
-        @logger.warn("Trouble parsing json", :key => key, :raw => raw,
-                      :exception => e)
-        next
-      end
+    begin
+      # TODO(sissel): Note, this will not successfully handle json lists
+      # like your text is '[ 1,2,3 ]' JSON.parse gives you an array (correctly)
+      # which won't merge into a hash. If someone needs this, we can fix it
+      # later.
+      dest.merge!(JSON.parse(event[@source]))
+      filter_matched(event)
+    rescue => e
+      event.tag("_jsonparsefailure")
+      @logger.warn("Trouble parsing json", :source => @source,
+                   :raw => event[@source], :exception => e)
+      return
     end
 
     @logger.debug("Event after json filter", :event => event)
+
   end # def filter
+
 end # class LogStash::Filters::Json

@@ -1,13 +1,14 @@
 require "test_utils"
 require "logstash/filters/date"
 
-describe LogStash::Filters::Date do
+puts "Skipping date tests because this ruby is not jruby" if RUBY_ENGINE != "jruby"
+describe LogStash::Filters::Date, :if => RUBY_ENGINE == "jruby" do
   extend LogStash::RSpec
 
-  describe "performance test of java syntax parsing" do
+  describe "performance test of java syntax parsing", :if => ENV["SPEEDTEST"] do
 
     event_count = 100000
-    min_rate = 5000
+    min_rate = 4000
 
     max_duration = event_count / min_rate
     input = "Nov 24 01:29:01 -0800"
@@ -21,15 +22,17 @@ describe LogStash::Filters::Date do
       }
       filter {
         date {
-          mydate => "MMM dd HH:mm:ss Z"
+          match => [ "mydate", "MMM dd HH:mm:ss Z" ]
         }
       }
       output { null { } }
     CONFIG
 
-    agent do
-      puts "date parse rate: #{event_count / @duration}"
-      insist { @duration } < max_duration
+    2.times do
+      agent do
+        puts "date parse rate: #{event_count / @duration}"
+        insist { @duration } < max_duration
+      end
     end
   end
 end

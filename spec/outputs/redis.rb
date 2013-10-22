@@ -38,8 +38,7 @@ describe LogStash::Outputs::Redis do
         id, element = redis.blpop(key, 0)
         event = LogStash::Event.new(JSON.parse(element))
         insist { event["sequence"] } == value
-        insist { event.message } == "hello world"
-        insist { event.type } == "generator"
+        insist { event["message"] } == "hello world"
       end
 
       # The list should now be empty
@@ -47,14 +46,15 @@ describe LogStash::Outputs::Redis do
     end # agent
   end
 
-  describe "skips a message which can't be encoded as json" do
+  describe "batch mode" do
     key = 10.times.collect { rand(10).to_s }.join("")
+    event_count = 200000
 
     config <<-CONFIG
       input {
         generator {
-          message => "\xAD\u0000"
-          count => 1
+          message => "hello world"
+          count => #{event_count}
           type => "generator"
         }
       }
@@ -63,15 +63,33 @@ describe LogStash::Outputs::Redis do
           host => "127.0.0.1"
           key => "#{key}"
           data_type => list
+          batch => true
+          batch_timeout => 5
+          timeout => 5
         }
       }
     CONFIG
 
     agent do
-      # Query redis directly and inspect the goodness.
+      # we have to wait for teardown to execute & flush the last batch.
+      # otherwise we might start doing assertions before everything has been
+      # sent out to redis.
+      sleep 2
+
       redis = Redis.new(:host => "127.0.0.1")
 
-      # The list should contain no elements.
+      # The list should contain the number of elements our agent pushed up.
+      insist { redis.llen(key) } == event_count
+
+      # Now check all events for order and correctness.
+      event_count.times do |value|
+        id, element = redis.blpop(key, 0)
+        event = LogStash::Event.new(JSON.parse(element))
+        insist { event["sequence"] } == value
+        insist { event["message"] } == "hello world"
+      end
+
+      # The list should now be empty
       insist { redis.llen(key) } == 0
     end # agent
   end

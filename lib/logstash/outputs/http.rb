@@ -10,7 +10,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # event json itself.
 
   config_name "http"
-  plugin_status "experimental"
+  milestone 1
 
   # URL to use
   config :url, :validate => :string, :required => :true
@@ -23,7 +23,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   config :http_method, :validate => ["put", "post"], :required => :true
 
   # Custom headers to use
-  # format is `headers => ["X-My-Header", "%{@source_host}"]
+  # format is `headers => ["X-My-Header", "%{host}"]
   config :headers, :validate => :hash
 
   # Content type
@@ -39,7 +39,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   #
   # For example:
   #
-  #    mapping => ["foo", "%{@source_host}", "bar", "%{@type}"]
+  #    mapping => ["foo", "%{host}", "bar", "%{type}"]
   config :mapping, :validate => :hash
 
   # Set the format of the http body.
@@ -47,8 +47,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # If form, then the body will be the mapping (or whole event) converted
   # into a query parameter string (foo=bar&baz=fizz...)
   #
+  # If message, then the body will be the result of formatting the event according to message
+  #
   # Otherwise, the event is sent as json.
-  config :format, :validate => ["json", "form"], :default => "json"
+  config :format, :validate => ["json", "form", "message"], :default => "json"
+
+  config :message, :validate => :string
 
   public
   def register
@@ -61,6 +65,17 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       case @format
         when "form" ; @content_type = "application/x-www-form-urlencoded"
         when "json" ; @content_type = "application/json"
+      end
+    end
+    if @format == "message"
+      if @message.nil?
+        raise "message must be set if message format is used"
+      end
+      if @content_type.nil?
+        raise "content_type must be set if message format is used"
+      end
+      unless @mapping.nil?
+        @logger.warn "mapping is not supported and will be ignored if message format is used"
       end
     end
   end # def register
@@ -98,6 +113,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     begin
       if @format == "json"
         request.body = evt.to_json
+      elsif @format == "message"
+        request.body = event.sprintf(@message)
       else
         request.body = encode(evt)
       end

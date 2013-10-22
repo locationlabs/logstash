@@ -7,40 +7,32 @@ require "csv"
 # and stores it as individual fields (can optionally specify the names).
 class LogStash::Filters::CSV < LogStash::Filters::Base
   config_name "csv"
-  plugin_status "beta"
+  milestone 2
 
-  # Config for csv is:
-  #   "source => dest".
   # The CSV data in the value of the source field will be expanded into a
-  # datastructure in the "dest" field.  Note: if the "dest" field
-  # already exists, it will be overridden.
-  config /[A-Za-z0-9_-]+/, :validate => :string
+  # datastructure.
+  config :source, :validate => :string, :default => "message"
 
-  # Define a list of field names (in the order they appear in the CSV,
+  # Define a list of column names (in the order they appear in the CSV,
   # as if it were a header line). If this is not specified or there
-  # are not enough fields specified, the default field name is "fieldN"
-  # (where N is the field number, starting from 1).
-  # Optional.
-  config :fields, :validate => :array, :default => []
+  # are not enough columns specified, the default column name is "columnX"
+  # (where X is the field number, starting from 1).
+  config :columns, :validate => :array, :default => []
 
   # Define the column separator value. If this is not specified the default
   # is a comma ','
   # Optional.
   config :separator, :validate => :string, :default => ","
 
+  # Define target for placing the data
+  # Defaults to writing to the root of the event.
+  config :target, :validate => :string
+
   public
   def register
-    @csv = {}
 
-    @config.each do |field, dest|
-      next if (RESERVED + ["fields", "separator"]).member?(field)
-      @csv[field] = dest
-    end
+    # Nothing to do here
 
-    # Default to parsing @message and dumping into @fields
-    if @csv.empty?
-      @csv["@message"] = "@fields"
-    end
   end # def register
 
   public
@@ -50,41 +42,47 @@ class LogStash::Filters::CSV < LogStash::Filters::Base
     @logger.debug("Running csv filter", :event => event)
 
     matches = 0
-    @csv.each do |key, dest|
-      if event[key]
-        if event[key].is_a?(String)
-          event[key] = [event[key]]
+
+    if event[@source]
+      if event[@source].is_a?(String)
+        event[@source] = [event[@source]]
+      end
+
+      if event[@source].length > 1
+        @logger.warn("csv filter only works on fields of length 1",
+                     :source => @source, :value => event[@source],
+                     :event => event)
+        return
+      end
+
+      raw = event[@source].first
+      begin
+        values = CSV.parse_line(raw, :col_sep => @separator)
+
+        if @target.nil?
+          # Default is to write to the root of the event.
+          dest = event
+        else
+          dest = event[@target] ||= {}
         end
 
-        if event[key].length > 1
-          @logger.warn("csv filter only works on fields of length 1",
-                       :key => key, :value => event[key],
-                       :event => event)
-          next
+        values.each_index do |i|
+          field_name = @columns[i] || "column#{i+1}"
+          dest[field_name] = values[i]
         end
 
-        raw = event[key].first
-        begin
-          values = CSV.parse_line(raw, {:col_sep => @separator})
-          data = {}
-          values.each_index do |i|
-            field_name = @fields[i] || "field#{i+1}"
-            data[field_name] = values[i]
-          end
-
-          event[dest] = data
-
-          filter_matched(event)
-        rescue => e
-          event.tags << "_csvparsefailure"
-          @logger.warn("Trouble parsing csv", :key => key, :raw => raw,
-                        :exception => e, :backtrace => e.backtrace)
-          next
-        end # begin
-      end # @csv.each
-    end # def filter
+        filter_matched(event)
+      rescue => e
+        event.tag "_csvparsefailure"
+        @logger.warn("Trouble parsing csv", :source => @source, :raw => raw,
+                      :exception => e)
+        return
+      end # begin
+    end # if event
 
     @logger.debug("Event after csv filter", :event => event)
+
   end # def filter
+
 end # class LogStash::Filters::Csv
 

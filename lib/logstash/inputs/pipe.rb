@@ -9,7 +9,11 @@ require "socket" # for Socket.gethostname
 #
 class LogStash::Inputs::Pipe < LogStash::Inputs::Base
   config_name "pipe"
-  plugin_status "experimental"
+  milestone 1
+
+  # TODO(sissel): This should switch to use the 'line' codec by default
+  # once we switch away from doing 'readline'
+  default :codec, "plain"
 
   # Command to run and read events from, one line at a time.
   #
@@ -20,23 +24,30 @@ class LogStash::Inputs::Pipe < LogStash::Inputs::Base
 
   public
   def register
-    LogStash::Util::set_thread_name("input|pipe|#{command}")
     @logger.info("Registering pipe input", :command => @command)
   end # def register
 
   public
   def run(queue)
-    @pipe = IO.popen(command, mode="r")
-    hostname = Socket.gethostname
+    begin
+      @pipe = IO.popen(@command, mode="r")
+      hostname = Socket.gethostname
 
-    @pipe.each do |line|
-      line = line.chomp
-      source = "pipe://#{hostname}/#{command}"
-      @logger.debug("Received line", :command => command, :line => line)
-      e = to_event(line, source)
-      if e
-        queue << e
+      @pipe.each do |line|
+        line = line.chomp
+        source = "pipe://#{hostname}/#{@command}"
+        @logger.debug? && @logger.debug("Received line", :command => @command, :line => line)
+        @codec.decode(line) do |event|
+          event["host"] = hostname
+          event["command"] = @command
+          decorate(event)
+          queue << event
+        end
       end
+    rescue Exception => e
+      @logger.error("Exception while running command", :e => e, :backtrace => e.backtrace)
+      sleep(10)
+      retry
     end
   end # def run
 end # class LogStash::Inputs::Pipe

@@ -17,7 +17,7 @@ require "logstash/namespace"
 #
 class LogStash::Outputs::Riemann < LogStash::Outputs::Base
   config_name "riemann"
-  plugin_status "experimental"
+  milestone 1
 
   # The address of the Riemann server.
   config :host, :validate => :string, :default => "localhost"
@@ -37,7 +37,7 @@ class LogStash::Outputs::Riemann < LogStash::Outputs::Base
   # The name of the sender.
   # This sets the `host` value
   # in the Riemann event
-  config :sender, :validate => :string, :default => "%{@source_host}"
+  config :sender, :validate => :string, :default => "%{host}"
 
   # A Hash to set Riemann event fields 
   # (<http://aphyr.github.com/riemann/concepts.html>).
@@ -79,15 +79,10 @@ class LogStash::Outputs::Riemann < LogStash::Outputs::Base
     r_event = Hash.new
     r_event[:host] = event.sprintf(@sender)
     # riemann doesn't handle floats so we reduce the precision here
-    r_event[:time] = event.unix_timestamp.to_i
-    r_event[:description] = event.message
+    r_event[:time] = event["@timestamp"].to_i
+    r_event[:description] = event["message"]
     if @riemann_event
       @riemann_event.each do |key, val|
-        # Catch invalid options since hash syntax doesn't support it
-        unless ["description","state","metric","ttl", "service"].include?(key) 
-          @logger.warn("Invalid key specified in riemann_event", :key => key)
-          next
-        end
         if ["ttl","metric"].include?(key)
           r_event[key.to_sym] = event.sprintf(val).to_f
         else

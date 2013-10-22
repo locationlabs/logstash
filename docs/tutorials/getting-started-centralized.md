@@ -42,7 +42,7 @@ for easy downloading of ElasticSearch:
 
     ES_PACKAGE=elasticsearch-%ELASTICSEARCH_VERSION%.zip
     ES_DIR=${ES_PACKAGE%%.zip}
-    SITE=https://github.com/downloads/elasticsearch/elasticsearch
+    SITE=https://download.elasticsearch.org/elasticsearch/elasticsearch
     if [ ! -d "$ES_DIR" ] ; then
       wget --no-check-certificate $SITE/$ES_PACKAGE
       unzip $ES_PACKAGE
@@ -61,7 +61,7 @@ Redis has no external dependencies and has a much simpler configuration in Logst
 
 Building and installing Redis is fairly straightforward. While normally this would be out of the scope of this document, as the instructions are so simple we'll include them here:
 
-- Download Redis from http://redis.io/download (The latest stable release is like what you want)
+- Download Redis from http://redis.io/download (The latest stable release is likely what you want)
 - Extract the source, change to the directory and run `make`
 - Run Redis with `src/redis-server --loglevel verbose`
 
@@ -72,15 +72,15 @@ That's it.
 Once you have elasticsearch and redis running, you're
 ready to configure logstash.
 
-Download the monolithic logstash release package. By 'monolithic' I mean the
-package contains all required dependencies to save you time chasing down
-requirements.
+Download the logstash release jar file. The package contains all
+required dependencies to save you time chasing down requirements.
 
-Follow [this link to download logstash-%VERSION%](http://logstash.objects.dreamhost.com/release/logstash-%VERSION%-monolithic.jar).
+Follow [this link to download logstash-%VERSION%](http://logstash.objects.dreamhost.com/release/logstash-%VERSION%-flatjar.jar).
 
-Since we're doing a centralized configuration, you'll have two main logstash
-agent roles: a shipper and an indexer. You will ship logs from all servers via Redis and have another agent receive those messages, parse
-them, and index them in elasticsearch.
+Since we're doing a centralized configuration, you'll have two main
+logstash agent roles: a shipper and an indexer. You will ship logs from
+all servers via Redis and have another agent receive those messages,
+parse them, and index them in elasticsearch.
 
 ### logstash log shipper
 
@@ -88,18 +88,18 @@ As with the simple example, we're going to start simple to ensure that events ar
 
     input {
       stdin {
-        type => "stdin-type"
+        type => "example"
       }
     }
 
     output {
-      stdout { debug => true debug_format => "json"}
+      stdout { codec => rubydebug }
       redis { host => "127.0.0.1" data_type => "list" key => "logstash" }
     }
 
 Put this in a file and call it 'shipper.conf' (or anything, really), and run: 
 
-    java -jar logstash-%VERSION%-monolithic.jar agent -f shipper.conf
+    java -jar logstash-%VERSION%-flatjar.jar agent -f shipper.conf
 
 This will take anything you type into this console and display it on the console. Additionally it will save events to Redis in a `list` named after the `key` value you provided.
 
@@ -120,10 +120,9 @@ Once connected, run the following commands:
     redis 127.0.0.1:6379> llen logstash
     (integer) 1
     redis 127.0.0.1:6379> lpop logstash
-    "{\"@source\":\"stdin://jvstratusmbp.local/\",\"@type\":\"stdin-type\",\"@tags\":[],\"@fields\":{},\"@timestamp\":\"2012-07-02T17:01:12.278000Z\",\"@source_host\":\"jvstratusmbp.local\",\"@source_path\":\"/\",\"@message\":\"test\"}"
+    "{\"message\":\"hello\",\"@timestamp\":\"2013-09-07T00:59:28.383Z\",\"@version\":\"1\",\"type\":\"stdin\",\"host\":\"pork\"}"
     redis 127.0.0.1:6379> llen logstash
     (integer) 0
-    redis 127.0.0.1:6379>
 
 What we've just done is check the length of the list, read and removed the oldest item in the list, and checked the length again.
 
@@ -145,13 +144,13 @@ sample config based on the previous section. Save this as `indexer.conf`
     input {
       redis {
         host => "127.0.0.1"
-        type => "redis-input"
         # these settings should match the output of the agent
         data_type => "list"
         key => "logstash"
 
-        # We use json_event here since the sender is a logstash agent
-        format => "json_event"
+        # We use the 'json' codec here because we expect to read
+        # json events from redis.
+        codec => json
       }
     }
     
@@ -167,7 +166,7 @@ The above configuration will attach to Redis and issue a `BLPOP` against the `lo
 
 Start the indexer the same way as the agent but specifying the `indexer.conf` file:
 
-`java -jar logstash-%VERSION%-monolithic.jar agent -f indexer.conf`
+`java -jar logstash-%VERSION%-flatjar.jar agent -f indexer.conf`
 
 To verify that your Logstash indexer is connecting to Elasticsearch properly, you should see a message in your Elasticsearch window similar to the following:
 
@@ -187,7 +186,7 @@ In your Elasticsearch window, you should see something like the following:
 Since indexes are created dynamically, this is the first sign that Logstash was able to write to ES. Let's use curl to verify our data is there:
 Using our curl command from the simple tutorial should let us see the data:
 
-`curl -s -XGET http://localhost:9200/logstash-2012.07.02/_search?q=@type:stdin-type`
+`curl -gs -XGET http://localhost:9200/logstash-*/_search?q=type:example`
 
 You may need to modify the date as this is based on the date this guide was written.
 
@@ -199,14 +198,12 @@ Run this on the same server as your elasticsearch server.
 To run the logstash web server, just run the jar with 'web' as the first
 argument. 
 
-    java -jar logstash-%VERSION%-monolithic.jar web --backend elasticsearch://127.0.0.1/
-
-As with the indexer, you should see the Logstash web interface connection:
-
-    [2012-07-02 13:28:34,818][INFO ][cluster.service          ] [Baron Samedi] added {[Nebulon][kaO6QIojTIav2liuTjGOsA][inet[/192.168.1.194:9302]]{client=true, data=false},}
+    java -jar logstash-%VERSION%-flatjar.jar web
 
 Just point your browser at the http://127.0.0.1:9292/ and start searching
 logs!
+
+The web interface is called 'kibana' - you can learn more about kibana at <http://kibana.org>
 
 # Distributing the load
 At this point we've been simulating a distributed environment on a single machine. If only the world were so easy.

@@ -62,13 +62,13 @@ require "set"
 class LogStash::Filters::Multiline < LogStash::Filters::Base
 
   config_name "multiline"
-  plugin_status "stable"
+  milestone 3
 
   # The regular expression to match
-  config :pattern, :validate => :string, :require => true
+  config :pattern, :validate => :string, :required => true
 
   # If the pattern matched, does event belong to the next or previous event?
-  config :what, :validate => ["previous", "next"], :require => true
+  config :what, :validate => ["previous", "next"], :required => true
 
   # Negate the regexp pattern ('if not matched')
   config :negate, :validate => :boolean, :default => false
@@ -85,7 +85,7 @@ class LogStash::Filters::Multiline < LogStash::Filters::Base
   # the new connection as a new stream and break any multiline goodness that
   # may have occurred between the old and new connection. To solve this use
   # case, you can use "%{@source_host}.%{@type}" instead.
-  config :stream_identity , :validate => :string, :default => "%{@source}.%{@type}"
+  config :stream_identity , :validate => :string, :default => "%{host}.%{path}.%{type}"
   
   # logstash ships by default with a bunch of patterns, so you don't
   # necessarily need to define this yourself unless you are adding additional
@@ -152,15 +152,15 @@ class LogStash::Filters::Multiline < LogStash::Filters::Base
   def filter(event)
     return unless filter?(event)
 
-    if event.message.is_a?(Array)
-      match = @grok.match(event.message.first)
+    if event["message"].is_a?(Array)
+      match = @grok.match(event["message"].first)
     else
-      match = @grok.match(event.message)
+      match = @grok.match(event["message"])
     end
     key = event.sprintf(@stream_identity)
     pending = @pending[key]
 
-    @logger.debug("Multiline", :pattern => @pattern, :message => event.message,
+    @logger.debug("Multiline", :pattern => @pattern, :message => event["message"],
                   :match => match, :negate => @negate)
 
     # Add negate option
@@ -169,7 +169,7 @@ class LogStash::Filters::Multiline < LogStash::Filters::Base
     case @what
     when "previous"
       if match
-        event.tags |= ["multiline"]
+        event.tag "multiline"
         # previous previous line is part of this event.
         # append it to the event and cancel it
         if pending
@@ -193,7 +193,7 @@ class LogStash::Filters::Multiline < LogStash::Filters::Base
       end # if/else match
     when "next"
       if match
-        event.tags |= ["multiline"]
+        event.tag "multiline"
         # this line is part of a multiline event, the next
         # line will be part, too, put it into pending.
         if pending
@@ -218,6 +218,8 @@ class LogStash::Filters::Multiline < LogStash::Filters::Base
     end # case @what
 
     if !event.cancelled?
+      event["message"] = event["message"].join("\n") if event["message"].is_a?(Array)
+      event["@timestamp"] = event["@timestamp"].first if event["@timestamp"].is_a?(Array)
       filter_matched(event)
     end
   end # def filter
@@ -233,4 +235,4 @@ class LogStash::Filters::Multiline < LogStash::Filters::Base
     @pending.clear
     return events
   end # def flush
-end # class LogStash::Filters::Date
+end # class LogStash::Filters::Multiline

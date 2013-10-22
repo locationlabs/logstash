@@ -17,22 +17,28 @@ require "set"
 #
 # If you need help building patterns to match your logs, you will find the
 # <http://grokdebug.herokuapp.com> too quite useful!
-# 
+#
 # #### Grok Basics
 #
 # Grok works by using combining text patterns into something that matches your
 # logs.
 #
-# The syntax for a grok pattern is '%{SYNTAX:SEMANTIC}'
+# The syntax for a grok pattern is `%{SYNTAX:SEMANTIC}`
 #
-# The 'SYNTAX' is the name of the pattern that will match your text. For
+# The `SYNTAX` is the name of the pattern that will match your text. For
 # example, "3.44" will be matched by the NUMBER pattern and "55.3.244.1" will
 # be matched by the IP pattern. The syntax is how you match.
 #
-# The 'SEMANTIC' is the identifier you give to the piece of text being matched.
+# The `SEMANTIC` is the identifier you give to the piece of text being matched.
 # For example, "3.44" could be the duration of an event, so you could call it
 # simply 'duration'. Further, a string "55.3.244.1" might identify the client
 # making a request.
+#
+# Optionally you can add a data type conversion to your grok pattern. By default
+# all semantics are saved as strings. If you wish to convert a semnatic's data type,
+# for example change a string to an integer then suffix it with the target data type.
+# For example `${NUMBER:num:int}` which converts the 'num' semantic from a string to an
+# integer. Currently the only supporting conversions are `int` and `float`.
 #
 # #### Example
 #
@@ -56,7 +62,7 @@ require "set"
 #     filter {
 #       grok {
 #         type => "examplehttp"
-#         pattern => "%{IP:client} %{WORD:method} %{URIPATHPARAM:request} %{NUMBER:bytes} %{NUMBER:duration}"
+#         match => [ "message", "%{IP:client} %{WORD:method} %{URIPATHPARAM:request} %{NUMBER:bytes} %{NUMBER:duration}" ]
 #       }
 #     }
 #
@@ -92,7 +98,7 @@ require "set"
 #
 # Alternately, you can create a custom patterns file. 
 #
-# * Create a directory called 'patterns' with a file in it called 'extra'
+# * Create a directory called `patterns` with a file in it called `extra`
 #   (the file name doesn't matter, but name it meaningfully for yourself)
 # * In that file, write the pattern you need as the pattern name, a space, then
 #   the regexp for that pattern.
@@ -102,7 +108,7 @@ require "set"
 #     # in ./patterns/postfix 
 #     POSTFIX_QUEUEID [0-9A-F]{11}
 #
-# Then use the 'patterns_dir' setting in this plugin to tell logstash where
+# Then use the `patterns_dir` setting in this plugin to tell logstash where
 # your custom patterns directory is. Here's a full example with a sample log:
 #
 #     Jan  1 06:25:43 mailserver14 postfix/cleanup[21403]: BEF25A72965: message-id=<20130101142543.5828399CCAF@mailserver14.example.com>
@@ -110,7 +116,7 @@ require "set"
 #     filter {
 #       grok {
 #         patterns_dir => "./patterns"
-#         pattern => "%{SYSLOGBASE} %{POSTFIX_QUEUEID:queue_id}: %{GREEDYDATA:message}"
+#         match => [ "message", "%{SYSLOGBASE} %{POSTFIX_QUEUEID:queue_id}: %{GREEDYDATA:message}" ]
 #       }
 #     }
 #
@@ -122,17 +128,17 @@ require "set"
 # * pid: 21403
 # * queue_id: BEF25A72965
 #
-# The 'timestamp', 'logsource', 'program', and 'pid' fields come from the
+# The `timestamp`, `logsource`, `program`, and `pid` fields come from the
 # SYSLOGBASE pattern which itself is defined by other patterns.
 class LogStash::Filters::Grok < LogStash::Filters::Base
   config_name "grok"
-  plugin_status "stable"
+  milestone 3
 
-  # Specify a pattern to parse with. This will match the '@message' field.
+  # Specify a pattern to parse with. This will match the 'message' field.
   #
-  # If you want to match other fields than @message, use the 'match' setting.
+  # If you want to match other fields than message, use the 'match' setting.
   # Multiple patterns is fine.
-  config :pattern, :validate => :array
+  config :pattern, :validate => :array, :deprecated => true
 
   # A hash of matches of field => value
   #
@@ -140,26 +146,11 @@ class LogStash::Filters::Grok < LogStash::Filters::Base
   #
   #     filter {
   #       grok {
-  #         match => [ "@message", "Duration: %{NUMBER:duration} ]
+  #         match => [ "message", "Duration: %{NUMBER:duration}" ]
   #       }
   #     }
   #
   config :match, :validate => :hash, :default => {}
-
-  # Shorthand for 'match'
-  #
-  #     filter {
-  #       grok {
-  #         # This configuration
-  #         match => [ "foo", "some pattern" ]
-  #
-  #         # is the same as this:
-  #         foo => "some pattern"
-  #       }
-  #     }
-  #
-  # It is preferable to use the 'match' setting instead of this.
-  config /[A-Za-z0-9_-]+/, :validate => :string, :deprecated => true
 
   #
   # logstash ships by default with a bunch of patterns, so you don't
@@ -194,14 +185,32 @@ class LogStash::Filters::Grok < LogStash::Filters::Base
 
   # If true, make single-value fields simply that value, not an array
   # containing that one value.
-  config :singles, :validate => :boolean, :default => false
+  config :singles, :validate => :boolean, :default => true
 
-  # TODO(sissel): Add this feature?
-  # When disabled, any pattern that matches the entire string will not be set.
-  # This is useful if you have named patterns like COMBINEDAPACHELOG that will
-  # match entire events and you really don't want to add a field
-  # 'COMBINEDAPACHELOG' that is set to the whole event line.
-  #config :capture_full_match_patterns, :validate => :boolean, :default => false
+  # If true, ensure the '_grokparsefailure' tag is present when there has been no
+  # successful match
+  config :tag_on_failure, :validate => :array, :default => ["_grokparsefailure"]
+
+  # The fields to overwrite.
+  #
+  # This allows you to overwrite a value in a field that already exists.
+  #
+  # For example, if you have a syslog line in the 'message' field, you can
+  # overwrite the 'message' field with part of the match like so:
+  #
+  #     filter {
+  #       grok {
+  #         match => [ 
+  #           "message",
+  #           "%{SYSLOGBASE} %{DATA:message}
+  #         ]
+  #         overwrite => [ "message" ]
+  #       }
+  #     }
+  #
+  #  In this case, a line like "May 29 16:37:11 sadness logger: hello world"
+  #  will be parsed and 'hello world' will overwrite the original message.
+  config :overwrite, :validate => :array, :default => []
 
   # Detect if we are running from a jarfile, pick the right path.
   @@patterns_path ||= Set.new
@@ -211,17 +220,11 @@ class LogStash::Filters::Grok < LogStash::Filters::Base
     @@patterns_path += ["#{File.dirname(__FILE__)}/../../../patterns/*"]
   end
 
-  # This flag becomes "--grok-patterns-path"
-  flag("--patterns-path PATH", "Colon-delimited path of patterns to load") do |val|
-    #@logger.info("Adding patterns path: #{val}")
-    @@patterns_path += val.split(":")
-  end
-
   public
   def initialize(params)
     super(params)
-    @match["@message"] ||= []
-    @match["@message"] += @pattern if @pattern # the config 'pattern' value (array)
+    @match["message"] ||= []
+    @match["message"] += @pattern if @pattern # the config 'pattern' value (array)
   end
 
   public
@@ -256,14 +259,7 @@ class LogStash::Filters::Grok < LogStash::Filters::Base
 
     @logger.info? and @logger.info("Match data", :match => @match)
 
-    # TODO(sissel): Hash.merge  actually overrides, not merges arrays.
-    # Work around it by implementing our own?
-    # TODO(sissel): Check if 'match' is empty?
-    @match.merge(@config).each do |field, patterns|
-      # Skip known config names
-      next if (RESERVED + ["match", "patterns_dir",
-               "drop_if_match", "named_captures_only", "pattern",
-               "keep_empty_captures", "break_on_match", "singles"]).include?(field)
+    @match.each do |field, patterns|
       patterns = [patterns] if patterns.is_a?(String)
 
       if !@patterns.include?(field)
@@ -338,7 +334,7 @@ class LogStash::Filters::Grok < LogStash::Filters::Base
           end
 
           # Special casing to skip captures that represent the entire log message.
-          if fieldvalue == value and field == "@message"
+          if fieldvalue == value and key.nil?
             # Skip patterns that match the entire message
             @logger.debug? and @logger.debug("Skipping capture since it matches the whole line.", :field => key)
             next
@@ -349,24 +345,30 @@ class LogStash::Filters::Grok < LogStash::Filters::Base
             next
           end
 
-          if event.fields[key].is_a?(String)
-            event.fields[key] = [event.fields[key]]
+          if @keep_empty_captures && event[key].nil?
+            event[key] = []
           end
 
-          if @keep_empty_captures && event.fields[key].nil?
-            event.fields[key] = []
-          end
-
-          # If value is not nil, or responds to empty and is not empty, add the
-          # value to the event.
-          if !value.nil? && (!value.empty? rescue true)
-            # Store fields as an array unless otherwise instructed with the
-            # 'singles' config option
-            if !event.fields.include?(key) and @singles
-              event.fields[key] = value
+          if value
+            if event.include?(key) && @overwrite.include?(key)
+              event[key] = value
             else
-              event.fields[key] ||= []
-              event.fields[key] << value
+              if event[key].is_a?(String)
+                event[key] = [event[key]]
+              end
+
+              # If value is not nil, or responds to empty and is not empty, add the
+              # value to the event.
+              if !value.nil? && (!value.empty? rescue true)
+                # Store fields as an array unless otherwise instructed with the
+                # 'singles' config option
+                if !event.include?(key) and @singles
+                  event[key] = value
+                else
+                  event[key] ||= []
+                  event[key] << value
+                end
+              end
             end
           end
         end # match.each_capture
@@ -378,7 +380,10 @@ class LogStash::Filters::Grok < LogStash::Filters::Base
     if !matched
       # Tag this event if we can't parse it. We can use this later to
       # reparse+reindex logs if we improve the patterns given .
-      event.tags << "_grokparsefailure" unless event.tags.include?("_grokparsefailure")
+      @tag_on_failure.each do |tag|
+        event["tags"] ||= []
+        event["tags"] << tag unless event["tags"].include?(tag)
+      end
     end
 
     @logger.debug? and @logger.debug("Event now: ", :event => event)

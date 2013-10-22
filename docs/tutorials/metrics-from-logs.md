@@ -21,7 +21,7 @@ metrics from logs and ship them to [graphite](http://graphite.wikidot.com/) so
 you can make pretty graphs of those metrics.
 
 One sample logster parser is one that pulls http response codes out of your
-apache logs: [SampleLogster.py](https://github.com/etsy/logster/blob/master/parsers/SampleLogster.py)
+apache logs: [SampleLogster.py](https://github.com/etsy/logster/blob/master/logster/parsers/SampleLogster.py)
 
 The above code is roughly 50 lines of python and only solves one specific
 problem in only apache logs: count http response codes by major number (1xx,
@@ -82,6 +82,3 @@ that logstash is a general-purpose log management and pipelining tool and that
 while you can centralize logs with logstash, you can read, modify, and write
 them to and from just about anywhere.
 
-## A full use case
-
-TODO(sissel): include sample logs, show custom grok format, output to statsd and/or graphite.
