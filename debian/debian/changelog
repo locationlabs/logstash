@@ -1,3 +1,10 @@
+logstash (1.2.1~1) unstable; urgency=low
+
+  * updated to logstash v1.2.1
+  * removed embeded kibana
+
+ -- Luis Morales <luis.morales@locationlabs.com>  Mon, 22 Oct 2013 23:07:11 +0100
+
 logstash (1.1.9~3) unstable; urgency=low
 
   * Avoid proccess fork when launching java process.
