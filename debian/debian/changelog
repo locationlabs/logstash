@@ -1,3 +1,9 @@
+logstash (1.2.2~1) unstable; urgency=low
+
+  * updated to logstash v1.2.2
+
+ -- Luis Morales <luis.morales@locationlabs.com>  Mon, 25 Nov 2013 18:55:19 +0100
+
 logstash (1.2.1~1) unstable; urgency=low
 
   * updated to logstash v1.2.1
