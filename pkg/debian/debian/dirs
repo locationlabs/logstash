@@ -17,3 +17,7 @@ var/cache/logstash
 
 # Temp dir for java
 var/logstash/
+
+# Logstash config
+etc/logstash
+etc/logstash/conf.d

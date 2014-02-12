@@ -1,1 +1,3 @@
 logstash.jar usr/share/logstash
+logstash.sh usr/share/logstash
+logstash.conf etc/supervisor/conf.d

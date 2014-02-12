@@ -48,46 +48,16 @@ fi
 cp $jar $destdir/$prefix/logstash.jar
 
 case $os@$release in
-  centos@*)
-    mkdir -p $destdir/etc/logrotate.d
-    mkdir -p $destdir/etc/sysconfig
-    mkdir -p $destdir/etc/init.d
-    mkdir -p $destdir/etc/logstash/conf.d
-    mkdir -p $destdir/opt/logstash/tmp
-    mkdir -p $destdir/var/lib/logstash
-    mkdir -p $destdir/var/run/logstash
-    mkdir -p $destdir/var/log/logstash
-    cp $os/sysconfig $destdir/etc/sysconfig/logstash
-    install -m644 logrotate.conf $destdir/etc/logrotate.d/logstash
-    install -m755 logstash.sysv.redhat $destdir/etc/init.d/logstash
-    ;;
   ubuntu@*)
     mkdir -p $destdir/etc/logstash/conf.d
     mkdir -p $destdir/etc/logrotate.d
-    mkdir -p $destdir/etc/init
+    mkdir -p $destdir/etc/supervisor/conf.d
     mkdir -p $destdir/var/lib/logstash
     mkdir -p $destdir/var/log/logstash
-    mkdir -p $destdir/etc/default
-    touch $destdir/etc/default/logstash
     install -m644 logrotate.conf $destdir/etc/logrotate.d/logstash
-    install -m644 logstash.default $destdir/etc/default/logstash
-    install -m644 logstash-web.default $destdir/etc/default/logstash-web
-    install -m755 logstash.upstart.ubuntu $destdir/etc/init/logstash.conf
-    install -m755 logstash-web.upstart.ubuntu $destdir/etc/init/logstash-web.conf
-    ;;
-  debian@*)
-    mkdir -p $destdir/etc/logstash/conf.d
-    mkdir -p $destdir/etc/logrotate.d
-    mkdir -p $destdir/etc/init.d
-    mkdir -p $destdir/var/lib/logstash
-    mkdir -p $destdir/var/log/logstash
-    mkdir -p $destdir/etc/default
-    touch $destdir/etc/default/logstash
-    install -m644 logrotate.conf $destdir/etc/logrotate.d/logstash
-    install -m644 logstash.default $destdir/etc/default/logstash
-    install -m644 logstash-web.default $destdir/etc/default/logstash-web
-    install -m755 logstash.sysv.debian $destdir/etc/init.d/logstash
-    install -m755 logstash-web.sysv.debian $destdir/etc/init.d/logstash-web
+    install -m644 logstash.conf $destdir/etc/supervisor/conf.d
+    install -m644 default.conf $destdir/etc/logstash/conf.d
+    install -m755 logstash.sh $destdir/opt/logstash
     ;;
   *) 
     echo "Unknown OS: $os $release"
@@ -97,19 +67,6 @@ esac
 
 description="logstash is a system for managing and processing events and logs"
 case $os in
-  centos|fedora|redhat) 
-    fpm -s dir -t rpm -n logstash -v "$RELEASE" \
-      -a noarch --iteration "1_${os}${RPM_REVISION}" \
-      --url "$URL" \
-      --description "$DESCRIPTION" \
-      -d "jre >= 1.6.0" \
-      --before-install centos/before-install.sh \
-      --before-remove centos/before-remove.sh \
-      --after-install centos/after-install.sh \
-      --config-files etc/sysconfig/logstash \
-      --config-files etc/logrotate.d/logstash \
-      -f -C $destdir .
-    ;;
   ubuntu|debian)
     if ! echo $RELEASE | grep -q '\.(dev\|rc.*)'; then
       # This is a dev or RC version... So change the upstream version
@@ -127,9 +84,8 @@ case $os in
       --before-install $os/before-install.sh \
       --before-remove $os/before-remove.sh \
       --after-install $os/after-install.sh \
-      --config-files /etc/default/logstash \
-      --config-files /etc/default/logstash-web \
       --config-files /etc/logrotate.d/logstash \
+      --config-files /etc/supervisor/conf.d \
       -f -C $destdir .
     ;;
 esac

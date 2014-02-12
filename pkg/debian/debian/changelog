@@ -1,3 +1,35 @@
+logstash (1.3.3~1) unstable; urgency=low
+
+  * updated to logstash v1.3.3
+
+ -- Luis Morales <luis.morales@locationlabs.com>  Tue, 11 Feb 2014 14:43:15 +0100
+
+logstash (1.2.2~1) unstable; urgency=low
+
+  * updated to logstash v1.2.2
+
+ -- Luis Morales <luis.morales@locationlabs.com>  Mon, 25 Nov 2013 18:55:19 +0100
+
+logstash (1.2.1~1) unstable; urgency=low
+
+  * updated to logstash v1.2.1
+  * removed embeded kibana
+
+ -- Luis Morales <luis.morales@locationlabs.com>  Mon, 22 Oct 2013 23:07:11 +0100
+
+logstash (1.1.9~3) unstable; urgency=low
+
+  * Avoid proccess fork when launching java process.
+
+ -- Eric Siegel <eric@locationlabs.com>  Mon, 02 May 2013 17:33:16 -0700
+
+logstash (1.1.9~2) unstable; urgency=low
+
+  * Depend on supervisord
+  * Removed init.d support
+
+ -- Luis Morales <luis.morales@locationlabs.com>  Mon, 01 Apr 2013 13:01:16 +0100
+
 logstash (1.1.10.dev~1) unstable; urgency=low
 
   * Dev builds of master.
